@@ -39,13 +39,17 @@ type CreateOpts struct {
 	// The associated volume type
 	VolumeType string `json:"volume_type,omitempty"`
         // The schedule parameters
-        ScheduleHint map[string]string `json:"OS-SCH-HNT:scheduler_hints,omitempty"`
+        SchedulerHints map[string]string `json:"-"`
 }
 
 // ToVolumeCreateMap assembles a request body based on the contents of a
 // CreateOpts.
 func (opts CreateOpts) ToVolumeCreateMap() (map[string]interface{}, error) {
-	return gophercloud.BuildRequestBody(opts, "volume")
+	m, err := gophercloud.BuildRequestBody(opts, "volume")
+	if len(opts.SchedulerHints) > 0 {
+		m["OS-SCH-HNT:scheduler_hints"] = opts.SchedulerHints
+	}
+	return m, err
 }
 
 // Create will create a new Volume based on the values in CreateOpts. To extract
