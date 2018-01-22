@@ -38,6 +38,8 @@ type CreateOpts struct {
 	ImageID string `json:"imageRef,omitempty"`
 	// The associated volume type
 	VolumeType string `json:"volume_type,omitempty"`
+        // The schedule parameters
+        ScheduleHint map[string]string `json:"OS-SCH-HNT:scheduler_hints,omitempty"`
 }
 
 // ToVolumeCreateMap assembles a request body based on the contents of a
