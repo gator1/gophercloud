@@ -5,11 +5,12 @@ import (
 	"net/url"
 	"reflect"
 
+	"strings"
+
 	"github.com/gophercloud/gophercloud"
 	tokens2 "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens"
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/utils"
-	"strings"
 )
 
 const (
@@ -180,63 +181,16 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, opts tokens3.Au
 	return nil
 }
 
-func GetProjectId(client *gophercloud.ProviderClient) (string, error) {
-	versions := []*utils.Version{
-		{ID: v20, Priority: 20, Suffix: "/v2.0/"},
-		{ID: v30, Priority: 30, Suffix: "/v3/"},
-	}
-
-	chosen, endpoint, err := utils.ChooseVersion(client, versions)
+func GetProjectId(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (string, error) {
+	newsc, err := initClientOpts(client, eo, "compute")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get project id failed, err = %s", err)
 	}
-
-	switch chosen.ID {
-	case v20:
-		return getV2ProjectId(client, endpoint)
-	case v30:
-		return getV3ProjectId(client, endpoint)
-	default:
-		return "", fmt.Errorf("Unrecognized identity version: %s", chosen.ID)
+	i := strings.Index(newsc.Endpoint, "/v2/")
+	if i == -1 {
+		return "", fmt.Errorf("get project id failed, which was parsed from endpoint of compute")
 	}
-}
-
-func getV2ProjectId(client *gophercloud.ProviderClient, endpoint string) (string, error) {
-	v2Client, err := NewIdentityV2(client, gophercloud.EndpointOpts{})
-	if err != nil {
-		return "", err
-	}
-
-	if endpoint != "" {
-		v2Client.Endpoint = endpoint
-	}
-
-	result := tokens2.Get(v2Client, client.TokenID)
-	token, err := result.ExtractToken()
-	if err != nil {
-		return "", err
-	}
-
-	return token.Tenant.ID, nil
-}
-
-func getV3ProjectId(client *gophercloud.ProviderClient, endpoint string) (string, error) {
-	v3Client, err := NewIdentityV3(client, gophercloud.EndpointOpts{})
-	if err != nil {
-		return "", err
-	}
-
-	if endpoint != "" {
-		v3Client.Endpoint = endpoint
-	}
-
-	result := tokens3.Get(v3Client, client.TokenID)
-	project, err := result.ExtractProject()
-	if err != nil {
-		return "", err
-	}
-
-	return project.ID, nil
+	return newsc.Endpoint[i+4 : len(newsc.Endpoint)-1], nil
 }
 
 // NewIdentityV2 creates a ServiceClient that may be used to interact with the v2 identity service.
@@ -293,7 +247,7 @@ func initClientOpts(client *gophercloud.ProviderClient, eo gophercloud.EndpointO
 }
 
 func initClientOpts1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts, clientType string) (*gophercloud.ServiceClient1, error) {
-	pid, e := GetProjectId(client)
+	pid, e := GetProjectId(client, eo)
 	if e != nil {
 		return nil, e
 	}
@@ -328,7 +282,7 @@ func NewNetworkV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpt
 
 // NewVpcV1 creates a ServiceClient that may be used with the v1 VPC for OTC.
 func NewVpcV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
-	pid, e := GetProjectId(client)
+	pid, e := GetProjectId(client, eo)
 	if e != nil {
 		return nil, e
 	}
